@@ -70,7 +70,9 @@
             //add the listener
             document.addEventListener('mousemove', handleMouseMove, false);
             document.addEventListener("keydown", keyhandle);
-
+            document.onclick = function(event) {
+                player.jump();
+            }
 
 
 
