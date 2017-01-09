@@ -1,0 +1,744 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset=utf-8>
+    <title>World</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+
+        canvas {
+            width: 100%;
+            height: 100%
+        }
+
+        #world {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: linear-gradient(#2A044A, #9DBCDA);
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="world"></div>
+
+    <script src="js/randomColor.js"></script>
+    <script src="js/three.js"></script>
+    <script src="js/OrbitControls.js"></script>
+    <script src="js/ColladaLoader.js"></script>
+
+
+    <script>
+        var Colors = {
+            darkgreen: 0x324024,
+            green: 0x5E7230,
+            pale: 0xC1DDF4,
+            blue: 0x45688E,
+            lightblue: 0x9DBCDA,
+            black: 0x282B2A,
+            orange: 0xFF8300,
+            brown: 0x53350A,
+            grass: 0x6B8E23,
+            pink: 0xFFC0CB
+
+        };
+
+        var player;
+        window.addEventListener('load', init, false);
+
+        function init() {
+
+
+            // set up the scene, the camera and the renderer
+            createScene();
+
+            // add the lights
+            createLights();
+
+            // add the objects
+            createPlayer();
+            createPlanet();
+            createSky();
+            //createObstacles();
+
+            //add the listener
+            document.addEventListener('mousemove', handleMouseMove, false);
+            document.addEventListener("keydown", keyhandle);
+
+
+
+
+            // start a loop that will update the objects' positions
+            // and render the scene on each frame
+            loop();
+        }
+
+
+        function loop() {
+            // Rotate the propeller, the sea and the sky
+            planet.mesh.rotation.z += player.velocity.x;
+            sky.mesh.rotation.z += 2 * player.velocity.x;
+
+            player.update(1 / 60);
+            // render the scene
+            renderer.render(scene, camera);
+
+            // call the loop function again
+            requestAnimationFrame(loop);
+        }
+
+
+
+        function normalize(v, vmin, vmax, tmin, tmax) {
+
+            var nv = Math.max(Math.min(v, vmax), vmin);
+            var dv = vmax - vmin;
+            var pc = (nv - vmin) / dv;
+            var dt = tmax - tmin;
+            var tv = tmin + (pc * dt);
+            return tv;
+
+        }
+
+
+        var scene,
+            camera, fieldOfView, aspectRatio, nearPlane, farPlane, HEIGHT, WIDTH,
+            renderer, container;
+        var controls;
+
+        function createScene() {
+            // Get the width and the height of the screen,
+            // use them to set up the aspect ratio of the camera
+            // and the size of the renderer.
+            HEIGHT = window.innerHeight;
+            WIDTH = window.innerWidth;
+
+            // Create the scene
+            scene = new THREE.Scene();
+
+            // Add a fog effect to the scene; same color as the
+            // background color used in the style sheet
+            scene.fog = new THREE.Fog(0x9DBCDA, 100, 2000);
+
+            // Create the camera
+            aspectRatio = WIDTH / HEIGHT;
+            fieldOfView = 60;
+            nearPlane = 1;
+            farPlane = 10000;
+            camera = new THREE.PerspectiveCamera(
+                fieldOfView,
+                aspectRatio,
+                nearPlane,
+                farPlane
+            );
+
+            // Set the position of the camera
+            camera.position.x = 0;
+            camera.position.z = 200;
+            camera.position.y = 100;
+
+
+
+            // Create the renderer
+            renderer = new THREE.WebGLRenderer({
+                // Allow transparency to show the gradient background
+                // we defined in the CSS
+                alpha: true,
+
+                // Activate the anti-aliasing; this is less performant,
+                // but, as our project is low-poly based, it should be fine :)
+                antialias: true
+            });
+
+            // Define the size of the renderer; in this case,
+            // it will fill the entire screen
+            renderer.setSize(WIDTH, HEIGHT);
+
+            // Enable shadow rendering
+            renderer.shadowMap.enabled = true;
+
+            // Add the DOM element of the renderer to the
+            // container we created in the HTML
+            container = document.getElementById('world');
+            container.appendChild(renderer.domElement);
+
+            //controls = new THREE.OrbitControls(camera, renderer.domElement);
+
+            // Listen to the screen: if the user resizes it
+            // we have to update the camera and the renderer size
+            window.addEventListener('resize', handleWindowResize, false);
+        }
+
+        function handleWindowResize() {
+            // update height and width of the renderer and the camera
+            HEIGHT = window.innerHeight;
+            WIDTH = window.innerWidth;
+            renderer.setSize(WIDTH, HEIGHT);
+            camera.aspect = WIDTH / HEIGHT;
+            camera.updateProjectionMatrix();
+        }
+
+        var hemisphereLight, shadowLight;
+
+        function createLights() {
+            // Add an ambient light with a gradient
+            hemisphereLight = new THREE.HemisphereLight(0xaaaaaa, 0x000000, .9)
+
+            // Add sunlight
+            shadowLight = new THREE.DirectionalLight(0xffffff, .9);
+
+            // Set the direction of the light
+            shadowLight.position.set(150, 350, 350);
+
+            // Allow shadow casting
+            shadowLight.castShadow = true;
+
+            // define the visible area of the projected shadow
+            shadowLight.shadow.camera.left = -400;
+            shadowLight.shadow.camera.right = 400;
+            shadowLight.shadow.camera.top = 400;
+            shadowLight.shadow.camera.bottom = -400;
+            shadowLight.shadow.camera.near = 1;
+            shadowLight.shadow.camera.far = 1000;
+
+            // define the resolution of the shadow; the higher the better,
+            // but also the more expensive and less performant
+            shadowLight.shadow.mapSize.width = 2048;
+            shadowLight.shadow.mapSize.height = 2048;
+
+            // to activate the lights, just add them to the scene
+            scene.add(hemisphereLight);
+            scene.add(shadowLight);
+        }
+        Tree = function() {
+            this.mesh = new THREE.Object3D();
+            this.height = Math.random() * 70 + 50;
+            this.breadth = Math.random() * this.height / 3 + 30;
+            this.trunk = new THREE.Mesh(new THREE.CylinderGeometry(this.breadth / 5, this.breadth / 5, this.height, 5, 5), new THREE.MeshLambertMaterial({
+                color: Colors.brown
+            }));
+            for (let i = 0; i < this.trunk.geometry.vertices.length; i++) {
+                this.trunk.geometry.vertices[i].x = this.trunk.geometry.vertices[i].x + (Math.random() - 1) * 15;
+                this.trunk.geometry.vertices[i].y = this.trunk.geometry.vertices[i].y + (Math.random() - 1) * 10;
+                this.trunk.geometry.vertices[i].z = this.trunk.geometry.vertices[i].z + (Math.random() - 1) * 25;
+
+            }
+            this.trunk.geometry.verticesNeedUpdate = true;
+
+            this.leaves = new THREE.Mesh(new THREE.DodecahedronGeometry(this.breadth), new THREE.MeshLambertMaterial({
+                color: Colors.green
+            }));
+
+            for (let i = 0; i < this.leaves.geometry.vertices.length; i++) {
+                this.leaves.geometry.vertices[i].x = this.leaves.geometry.vertices[i].x + (Math.random() - 1) * 15;
+                this.leaves.geometry.vertices[i].y = this.leaves.geometry.vertices[i].y + (Math.random() - 1) * 10;
+                this.leaves.geometry.vertices[i].z = this.leaves.geometry.vertices[i].z + (Math.random() - 1) * 25;
+            }
+            this.trunk.geometry.verticesNeedUpdate = true;
+            this.leaves.position.y += this.height - this.breadth;
+            this.mesh.add(this.trunk);
+            this.mesh.add(this.leaves);
+            this.trunk.position.y += 25;
+            this.leaves.position.y += 25;
+
+
+        }
+        Animal = function() {
+            this.mesh = new THREE.Object3D();
+            this.body = new THREE.Mesh(new THREE.BoxGeometry(30, 30, 70), new THREE.MeshLambertMaterial({
+                color: Colors.pink
+            }));
+            this.legfl = new THREE.Mesh(new THREE.BoxGeometry(5, 30, 5), new THREE.MeshLambertMaterial({
+                color: Colors.pink
+            }));
+            this.legfr = new THREE.Mesh(new THREE.BoxGeometry(5, 30, 5), new THREE.MeshLambertMaterial({
+                color: Colors.pink
+            }));
+            this.legbl = new THREE.Mesh(new THREE.BoxGeometry(5, 30, 5), new THREE.MeshLambertMaterial({
+                color: Colors.pink
+            }));
+            this.legbr = new THREE.Mesh(new THREE.BoxGeometry(5, 30, 5), new THREE.MeshLambertMaterial({
+                color: Colors.pink
+            }));
+
+            this.head = new THREE.Mesh(new THREE.BoxGeometry(40, 40, 40), new THREE.MeshLambertMaterial({
+                color: Colors.pink
+            }));
+
+
+            this.body.position.y += 25;
+
+            this.legfl.position.z += 30;
+            this.legfl.position.x += 10;
+
+            this.legfr.position.z += 30;
+            this.legfr.position.x -= 10;
+
+            this.legbr.position.z -= 30;
+            this.legbr.position.x -= 10;
+
+            this.legbl.position.z -= 30;
+            this.legbl.position.x += 10;
+
+            this.head.position.z += 30;
+            this.head.position.y += 45;
+
+            this.mesh.add(this.body);
+            this.mesh.add(this.legfl);
+            this.mesh.add(this.legfr);
+            this.mesh.add(this.legbl);
+            this.mesh.add(this.legbr);
+            this.mesh.add(this.head);
+
+        }
+
+        // First let's define a Sea object :
+        Planet = function() {
+            this.mesh = new THREE.Object3D();
+
+            // create the geometry (shape) of the cylinder;
+            // the parameters are:
+            // radius top, radius bottom, height, number of segments on the radius, number of segments vertically
+            var geom = new THREE.CylinderGeometry(1000, 1000, 900, 100, 50);
+
+            // rotate the geometry on the x axis
+            geom.applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+
+            // create the material
+            var mat = new THREE.MeshPhongMaterial({
+                color: Colors.grass,
+                transparent: true,
+                opacity: 1,
+                shading: THREE.FlatShading,
+            });
+
+
+
+
+
+
+            this.trees = new THREE.Object3D();
+            for (let i = 0; i < 50; i++) {
+
+                this.trees.add(new Tree().mesh);
+                let theta = Math.random() * Math.PI * 2;
+                let pos = new THREE.Vector3(-200 - Math.random() * 300, 1000 * Math.cos(theta), 1000 * Math.sin(theta));
+                this.trees.children[i].position.copy(pos);
+                this.trees.children[i].rotation.x = theta;
+
+
+            }
+            this.trees.applyMatrix(new THREE.Matrix4().makeRotationY(-Math.PI / 2));
+
+
+            this.animals = new THREE.Object3D();
+
+            var ptheta, offs, pos;
+            ptheta = Math.random() * Math.PI * 2;
+            for (let i = 0; i < 5; i++) {
+
+                this.animals.add(new Animal().mesh);
+                offs = Math.random();
+
+                pos = new THREE.Vector3(-200 - Math.random() * 300, 1000 * Math.cos(ptheta + offs), 1000 * Math.sin(ptheta + offs));
+                this.animals.children[i].position.copy(pos);
+                this.animals.children[i].rotation.x = ptheta + offs;
+
+
+            }
+
+
+            this.animals.applyMatrix(new THREE.Matrix4().makeRotationY(-Math.PI / 2));
+
+
+
+            // To create an object in Three.js, we have to create a mesh
+            // which is a combination of a geometry and some material
+            this.greenery = new THREE.Mesh(geom, mat);
+            this.greenery.position.z = -350;
+
+            var verts = this.greenery.geometry.vertices;
+            var l = verts.length;
+            for (let i = 0; i < l; i++) {
+                var v = verts[i];
+
+
+                if (v.z > 30 + 350 || v.z < -110 + 350) {
+                    v.x = v.x + (Math.random() - 1) * 25;
+                    v.y = v.y + (Math.random() - 1) * 25;
+                }
+            }
+
+
+
+            this.greenery.geometry.colorsNeedUpdate = true;
+
+            this.greenery.geometry.verticesNeedUpdate = true;
+
+            this.road = new THREE.Mesh(new THREE.CylinderGeometry(1001, 1001, 108, 100, 1), new THREE.MeshPhongMaterial({
+                color: Colors.black,
+                transparent: true,
+                opacity: 1,
+                shading: THREE.FlatShading,
+            }));
+            this.road.applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+
+            this.road.position.z = -40;
+
+            this.roadlines = new THREE.Object3D();
+            for (i = 0; i < 100; i++) {
+                this.roadlines.add(new THREE.Mesh(new THREE.CylinderGeometry(1001.1, 1001.1, 10, 100, 1, false, i / 100 * 2 * Math.PI, 1 / 200 * 2 * Math.PI), new THREE.MeshPhongMaterial({
+                    color: Colors.pale,
+                    transparent: true,
+                    opacity: 1,
+                    shading: THREE.FlatShading,
+                })));
+            }
+
+            this.roadlines.applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+
+            this.roadlines.position.z = -30;
+
+            this.curb = new THREE.Object3D();
+
+            this.curb.add(new THREE.Mesh(new THREE.CylinderGeometry(1005, 1005, 10, 100, 1), new THREE.MeshPhongMaterial({
+                color: Colors.lightblue,
+                transparent: true,
+                opacity: 1,
+                shading: THREE.FlatShading,
+            })));
+            this.curb.add(new THREE.Mesh(new THREE.CylinderGeometry(1005, 1005, 10, 100, 1), new THREE.MeshPhongMaterial({
+                color: Colors.lightblue,
+                transparent: true,
+                opacity: 1,
+                shading: THREE.FlatShading,
+            })));
+            this.curb.children[0].applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+            this.curb.children[1].applyMatrix(new THREE.Matrix4().makeRotationX(-Math.PI / 2));
+
+            this.curb.children[0].position.z -= 80;
+            this.curb.children[1].position.z += 20;
+
+            this.mountains = new THREE.Object3D();
+            for (i = 0; i < 400; i++) {
+                let geo = new THREE.ConeGeometry(100 + 100 * Math.random(), 200 + 200 * Math.random(), 10, 10);
+
+                let verts = geo.vertices;
+
+                let l = verts.length;
+                for (let s = 0; s < l; s++) {
+                    let v = verts[s];
+                    v.x = v.x + (Math.random() - 1) * 10;
+                    v.y = v.y + (Math.random() - 1) * 30;
+
+                }
+
+                let faceIndices = ['a', 'b', 'c'];
+                let p, colors, f, vertexIndex;
+                for (let s = 0; s < geo.faces.length; s++) {
+                    f = geo.faces[s];
+                    for (var j = 0; j < 3; j++) {
+                        vertexIndex = f[faceIndices[j]];
+                        p = geo.vertices[vertexIndex];
+                        if (p.y > 100) {
+                            color = (new THREE.Color(0xffffff));
+                        } else {
+                            color = (new THREE.Color(Colors.blue));
+                        }
+                        f.vertexColors[j] = color;
+                    }
+                }
+
+
+
+                mount = new THREE.Mesh(geo, new THREE.MeshPhongMaterial({
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 1,
+                    shading: THREE.FlatShading,
+                    vertexColors: THREE.VertexColors
+                }));
+
+                geo.colorsNeedUpdate = true;
+
+
+
+                let theta = Math.random() * 2 * Math.PI;
+                mount.rotation.x = theta;
+                mount.position.z = 1000 * Math.sin(theta);
+                mount.position.y = 1000 * Math.cos(theta);
+
+
+                this.mountains.add(mount);
+            }
+            this.mountains.applyMatrix(new THREE.Matrix4().makeRotationY(-Math.PI / 2));
+
+            for (moun of this.mountains.children) {
+                moun.position.x = Math.random() * 200;
+                moun.scale = (new THREE.Vector3(1 + moun.position.x / 200, 1 + moun.position.x / 200, 1 + moun.position.x / 200));
+            }
+
+            this.mountains.position.z -= 900;
+
+            this.mesh.add(this.mountains);
+            this.mesh.add(this.curb);
+            this.mesh.add(this.road);
+            this.mesh.add(this.roadlines);
+            this.mesh.add(this.greenery);
+            this.mesh.add(this.trees);
+            this.mesh.add(this.animals);
+
+
+            this.curb.children[0].receiveShadow = true;
+            this.curb.children[1].receiveShadow = true;
+            this.road.receiveShadow = true;
+            this.roadlines.receiveShadow = true;
+            this.greenery.receiveShadow = true;
+        }
+
+        // Instantiate the sea and add it to the scene:
+
+        var planet;
+
+        function createPlanet() {
+            planet = new Planet();
+
+            // push it a little bit at the bottom of the scene
+            planet.mesh.position.y = -1000;
+
+            // add the mesh of the sea to the scene
+            scene.add(planet.mesh);
+        }
+
+
+        Cloud = function() {
+                // Create an empty container that will hold the different parts of the cloud
+                this.mesh = new THREE.Object3D();
+
+                // create a cube geometry;
+                // this shape will be duplicated to create the cloud
+                var geom = new THREE.BoxGeometry(20, 20, 20);
+
+                // create a material; a simple white material will do the trick
+                var mat = new THREE.MeshPhongMaterial({
+                    color: Colors.pale,
+                });
+
+                // duplicate the geometry a random number of times
+                var nBlocs = 3 + Math.floor(Math.random() * 3);
+                for (var i = 0; i < nBlocs; i++) {
+
+                    // create the mesh by cloning the geometry
+                    var m = new THREE.Mesh(geom, mat);
+
+                    // set the position and the rotation of each cube randomly
+                    m.position.x = i * 15;
+                    m.position.y = Math.random() * 10;
+                    m.position.z = Math.random() * 10;
+                    m.rotation.z = Math.random() * Math.PI * 2;
+                    m.rotation.y = Math.random() * Math.PI * 2;
+
+                    // set the size of the cube randomly
+                    var s = .1 + Math.random() * .9;
+                    m.scale.set(s, s, s);
+
+                    // allow each cube to cast and to receive shadows
+                    m.castShadow = true;
+                    m.receiveShadow = true;
+
+                    // add the cube to the container we first created
+                    this.mesh.add(m);
+                }
+            }
+            // Define a Sky Object
+        Sky = function() {
+            // Create an empty container
+            this.mesh = new THREE.Object3D();
+
+            // choose a number of clouds to be scattered in the sky
+            this.nClouds = 100;
+
+            // To distribute the clouds consistently,
+            // we need to place them according to a uniform angle
+            var stepAngle = Math.PI * 2 / this.nClouds;
+
+            // create the clouds
+            for (var i = 0; i < this.nClouds; i++) {
+                var c = new Cloud();
+
+                // set the rotation and the position of each cloud;
+                // for that we use a bit of trigonometry
+                var a = stepAngle * i; // this is the final angle of the cloud
+                var h = 1300 + Math.random() * 200; // this is the distance between the center of the axis and the cloud itself
+
+                // Trigonometry!!! I hope you remember what you've learned in Math :)
+                // in case you don't:
+                // we are simply converting polar coordinates (angle, distance) into Cartesian coordinates (x, y)
+                c.mesh.position.y = Math.sin(a) * h;
+                c.mesh.position.x = Math.cos(a) * h;
+
+                // rotate the cloud according to its position
+                c.mesh.rotation.z = a + Math.PI / 2;
+
+                // for a better result, we position the clouds
+                // at random depths inside of the scene
+                c.mesh.position.z = -700 - Math.random() * 900;
+
+                // we also set a random scale for each cloud
+                var s = 1 + Math.random() * 2;
+                c.mesh.scale.set(s, s, s);
+
+                // do not forget to add the mesh of each cloud in the scene
+                this.mesh.add(c.mesh);
+            }
+        }
+
+        // Now we instantiate the sky and push its center a bit
+        // towards the bottom of the screen
+
+        var sky;
+
+        function createSky() {
+            sky = new Sky();
+            sky.mesh.position.y = -1000;
+            scene.add(sky.mesh);
+        }
+
+
+        Player = function() {
+            this.velocity = new THREE.Vector3(0.005, 0, 0);
+            this.mesh = new THREE.Mesh(new THREE.BoxGeometry(20, 20, 20), new THREE.MeshPhongMaterial({
+                color: Colors.orange,
+            }));
+            this.mesh.castShadow = true;
+            this.mesh.reciveShadow = true;
+            this.grounded = false;
+            this.doubleJumped = true;
+            this.totalTime = 0;
+            this.mesh.position.z = -8;
+            this.update = function(delta) {
+                this.totalTime += delta;
+                this.mesh.rotation.z -= 10 * delta;
+
+                this.grounded = false;
+                this.velocity.y -= 400 * delta;
+                this.y += this.velocity.y * delta;
+                this.mesh.position.z += this.velocity.z * delta;
+                this.mesh.position.z = Math.max(-200, Math.min(this.mesh.position.z, 20));
+                if (this.y < 10) {
+                    this.y = 10;
+                    this.velocity.y = 0;
+                    this.grounded = true;
+                    this.doubleJumped = false;
+
+                }
+                for (var i = jpart.children.length - 1; i >= 0; i--) {
+                    let ch = jpart.children[i];
+                    ch.position.add(ch.velocity);
+                    ch.material.opacity -= 1 / (20)
+                    if (ch.material.opacity <= 0) {
+                        jpart.children.pop(ch)
+                    }
+                }
+                if (this.grounded)
+                    this.mesh.position.y = this.y + 4 * Math.sin(this.totalTime * 10 * 4 + 0.1) + 4;
+                else
+                    this.mesh.position.y = this.y;
+
+            }
+
+            this.jump = function() {
+                if (this.grounded) {
+                    this.velocity.y = 270;
+                    this.makeJumpParticles(Colors.black);
+                } else if (!this.doubleJumped) {
+                    this.velocity.y = 270;
+                    this.doubleJumped = true;
+                    this.makeJumpParticles(Colors.pale);
+                }
+
+
+            }
+            this.makeJumpParticles = function(c) {
+
+
+                // duplicate the geometry a random number of times
+                var nBlocs = 100;
+                for (var i = 0; i < nBlocs; i++) {
+
+                    // create the mesh by cloning the geometry
+                    var m = new THREE.Mesh(new THREE.BoxGeometry(2 * Math.random(), 2 * Math.random(), 2 * Math.random()), new THREE.MeshLambertMaterial({
+                        color: c,
+                        transparent: true
+                    }));
+
+                    // set the position and the rotation of each cube randomly
+                    m.position.copy(this.mesh.position);
+                    m.rotation.z = Math.random() * Math.PI * 2;
+                    m.rotation.y = Math.random() * Math.PI * 2;
+                    m.velocity = new THREE.Vector3(3 * (Math.random() - 0.5), -Math.random(), 3 * (Math.random() - 0.5));
+
+
+                    //set the size of the cube randomly
+                    var s = 1 + Math.random() * .3;
+                    m.scale.set(s, s, s);
+
+
+                    // add the cube to the container we first created
+                    jpart.add(m);
+                }
+
+                scene.add(jpart);
+            }
+        }
+
+        function createPlayer() {
+            player = new Player();
+            player.y = 100;
+            scene.add(player.mesh);
+        }
+        var jpart = new THREE.Object3D();
+        var mousePos = {
+            x: 0,
+            y: 0
+        };
+
+        // now handle the mousemove event
+
+        function handleMouseMove(event) {
+
+            // here we are converting the mouse position value received
+            // to a normalized value varying between -1 and 1;
+            // this is the formula for the horizontal axis:
+
+            var tx = -1 + (event.clientX / WIDTH) * 2;
+
+            // for the vertical axis, we need to inverse the formula
+            // because the 2D y-axis goes the opposite direction of the 3D y-axis
+
+            var ty = 1 - (event.clientY / HEIGHT) * 2;
+            mousePos = {
+                x: tx,
+                y: ty
+            };
+
+        }
+
+        function keyhandle(event) {
+            if (event.keyCode == 32) { //spacebar
+                player.jump();
+            }
+        }
+    </script>
+
+</body>
+
+</html>
